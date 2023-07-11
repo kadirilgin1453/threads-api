@@ -45,7 +45,7 @@ async def get_user_replies():
             if len(thread["thread_items"]) > 1:
                 print(f"{username}'s Reply: {thread['thread_items'][1]['post']['caption']} || Likes: {thread['thread_items'][1]['post']['like_count']}\n-")
             else:
-                print(f"-> You will need to sign up / login to see more.")
+                print("-> You will need to sign up / login to see more.")
 
     else:
         print(f"User ID not found for username '{username}'")

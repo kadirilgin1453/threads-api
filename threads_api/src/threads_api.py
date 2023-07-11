@@ -25,9 +25,9 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 BASE_URL = "https://i.instagram.com/api/v1"
-LOGIN_URL = BASE_URL + "/bloks/apps/com.bloks.www.bloks.caa.login.async.send_login_request/"
-POST_URL_TEXTONLY = BASE_URL + "/media/configure_text_only_post/"
-POST_URL_IMAGE = BASE_URL + "/media/configure_text_post_app_feed/"
+LOGIN_URL = f"{BASE_URL}/bloks/apps/com.bloks.www.bloks.caa.login.async.send_login_request/"
+POST_URL_TEXTONLY = f"{BASE_URL}/media/configure_text_only_post/"
+POST_URL_IMAGE = f"{BASE_URL}/media/configure_text_post_app_feed/"
 DEFAULT_HEADERS = {
             'Authority': 'www.threads.net',
             'Accept': '*/*',
@@ -145,7 +145,7 @@ class ThreadsAPI:
             with open(cached_token_path, "rb") as fd:
                 encrypted_token = fd.read()
             return SimpleEncDec.password_decrypt(encrypted_token, password).decode()
-        
+
         async def _set_logged_in_state(username, token):
             self.token = token
             self.user_id = await self.get_user_id_from_username(username)
@@ -168,12 +168,10 @@ class ThreadsAPI:
         if cached_token_path is not None and os.path.exists(cached_token_path):
             try:
                 await _set_logged_in_state(username, _get_token_from_cache(cached_token_path, password))
-                
+
                 return True
             except LoggedOutException as e:
                 print(f"[Error] {e}. Attempting to re-login.")
-                pass
-            
         try:
             blockVersion = "5f56efad68e1edec7801f630b5c122704ec5378adbee6609a448f105f34a9c73"
             headers = {
@@ -199,7 +197,7 @@ class ThreadsAPI:
             )
 
             payload = f"params={urllib.parse.quote(params)}&bk_client_context={urllib.parse.quote(bk_client_context)}&bloks_versioning_id={blockVersion}"
-            
+
             async with aiohttp.ClientSession() as session:
                 async with session.post(LOGIN_URL, timeout=60 * 1000, headers=headers, data=payload) as response:
                     data = await response.text()
@@ -212,9 +210,9 @@ class ThreadsAPI:
                 pos = pos[1]
                 pos = pos.split("==")[0]
                 token = f"{pos}=="
-                
+
                 await _set_logged_in_state(username, token)
-                
+
                 if cached_token_path is not None:
                     _save_token_to_cache(cached_token_path, token)
                 return True
@@ -242,19 +240,18 @@ class ThreadsAPI:
             str: The user ID if found, or None if the user ID is not found.
         """
         if self.is_logged_in:
-            url = BASE_URL + f"/users/{username}/usernameinfo/"
+            url = f"{BASE_URL}/users/{username}/usernameinfo/"
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, headers=self.auth_headers) as response:
                     data = await response.json()
-                    
+
                     if 'message' in data and data['message'] == "login_required" or \
-                        'status' in data and data['status'] == 'fail':
+                            'status' in data and data['status'] == 'fail':
                         raise LoggedOutException(str(data))
-                    user_id = int(data['user']['pk'])
-                    return user_id
+                    return int(data['user']['pk'])
         else:
             url = f"https://www.threads.net/@{username}"
-            
+
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, headers=await self._get_public_headers()) as response:
                     text = await response.text()
@@ -262,7 +259,7 @@ class ThreadsAPI:
             text = text.replace('\\s', "").replace('\\n', "")
             user_id = re.search(r'"props":{"user_id":"(\d+)"},', text)
 
-            return user_id.group(1) if user_id else None
+            return user_id[1] if user_id else None
 
     async def get_user_profile(self, user_id: str):
         """
@@ -289,7 +286,7 @@ class ThreadsAPI:
             'x-fb-friendly-name': 'BarcelonaProfileRootQuery',
             'x-fb-lsd': self.FBLSDToken,
         })
-        
+
         payload = {
                 'lsd': self.FBLSDToken,
                 'variables': json.dumps(
@@ -304,9 +301,8 @@ class ThreadsAPI:
             async with session.post(url, headers=modified_headers, data=payload) as response:
                 text = await response.text()
                 data = json.loads(text)
-               
-        user = data['data']['userData']['user']
-        return user
+
+        return data['data']['userData']['user']
 
     async def get_user_threads(self, user_id: str):
         """
@@ -322,7 +318,7 @@ class ThreadsAPI:
             Exception: If an error occurs during the thread retrieval process.
         """
         url = 'https://www.threads.net/api/graphql'
-        
+
         modified_headers = copy.deepcopy(await self._get_public_headers())
 
         modified_headers.update({
@@ -333,7 +329,7 @@ class ThreadsAPI:
             'x-fb-friendly-name': 'BarcelonaProfileThreadsTabQuery',
             'x-fb-lsd': self.FBLSDToken,
         })
-        
+
         payload = {
                 'lsd': self.FBLSDToken,
                 'variables': json.dumps(
@@ -343,7 +339,7 @@ class ThreadsAPI:
                 ),
                 'doc_id': '6307072669391286'
             }
-        
+
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=modified_headers, data=payload) as response:
                 try:
@@ -352,8 +348,7 @@ class ThreadsAPI:
                 except (aiohttp.ContentTypeError, json.JSONDecodeError):
                     raise Exception('Failed to decode response as JSON')
 
-        threads = data['data']['mediaData']['threads']
-        return threads
+        return data['data']['mediaData']['threads']
     
     async def get_user_replies(self, user_id: str):
         """
@@ -380,7 +375,7 @@ class ThreadsAPI:
             'x-fb-friendly-name': 'BarcelonaProfileRepliesTabQuery',
             'x-fb-lsd': self.FBLSDToken,
         })
-        
+
         payload = {
                 'lsd': self.FBLSDToken,
                 'variables': json.dumps(
@@ -399,8 +394,7 @@ class ThreadsAPI:
                 except (aiohttp.ContentTypeError, json.JSONDecodeError):
                     raise Exception('Failed to decode response as JSON')
 
-        threads = data['data']['mediaData']['threads']
-        return threads
+        return data['data']['mediaData']['threads']
     
     async def follow_user(self, user_id: str) -> bool:
         """
@@ -459,7 +453,7 @@ class ThreadsAPI:
 
         text = text.replace('\\s', "").replace('\\n', "")
         post_id = re.search(r'"props":{"post_id":"(\d+)"},', text)
-        return post_id.group(1)
+        return post_id[1]
 
     async def get_post(self, post_id: str):
         """
@@ -475,7 +469,7 @@ class ThreadsAPI:
             Exception: If an error occurs during the post retrieval process.
         """
         url = 'https://www.threads.net/api/graphql'
-        
+
         modified_headers = copy.deepcopy(await self._get_public_headers())
 
         modified_headers.update({
@@ -486,7 +480,7 @@ class ThreadsAPI:
             'x-fb-friendly-name': 'BarcelonaPostPageQuery',
             'x-fb-lsd': self.FBLSDToken,
         })
-        
+
         payload = {
                 'lsd': self.FBLSDToken,
                 'variables': json.dumps(
@@ -505,8 +499,7 @@ class ThreadsAPI:
                 except (aiohttp.ContentTypeError, json.JSONDecodeError):
                     raise Exception('Failed to decode response as JSON')
 
-        threads = data['data']['data']
-        return threads
+        return data['data']['data']
     
     async def get_post_likes(self, post_id:int):
         """
@@ -574,7 +567,7 @@ class ThreadsAPI:
         """
         def __get_app_headers() -> dict:
             headers = {
-                "User-Agent": f"Barcelona 289.0.0.77.109 Android",
+                "User-Agent": "Barcelona 289.0.0.77.109 Android",
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
             }
             if self.token is not None:
@@ -610,7 +603,7 @@ class ThreadsAPI:
 
             upload_id = int(time.time() * 1000)
             name = f"{upload_id}_0_{random.randint(1000000000, 9999999999)}"
-            url = "https://www.instagram.com/rupload_igphoto/" + name
+            url = f"https://www.instagram.com/rupload_igphoto/{name}"
             mime_type = None
             if image_content is None:
                 with open(image_url, mode="rb") as f:
@@ -647,9 +640,11 @@ class ThreadsAPI:
                 mime_type = mime_type.replace("image/", "")
             image_headers = {
                 "X_FB_PHOTO_WATERFALL_ID": str(uuid.uuid4()),
-                "X-Entity-Type": "image/" + mime_type,
+                "X-Entity-Type": f"image/{mime_type}",
                 "Offset": "0",
-                "X-Instagram-Rupload-Params": json.dumps(x_instagram_rupload_params),
+                "X-Instagram-Rupload-Params": json.dumps(
+                    x_instagram_rupload_params
+                ),
                 "X-Entity-Name": f"{name}",
                 "X-Entity-Length": f"{content_length}",
                 "Content-Type": "application/octet-stream",
@@ -667,13 +662,13 @@ class ThreadsAPI:
 
         if not self.is_logged_in:
             raise Exception("You need to login before posting")
-        
+
         now = datetime.now()
         timezone_offset = (datetime.now() - datetime.utcnow()).seconds
 
         params = {
             "text_post_app_info": {"reply_control": 0},
-            "timezone_offset": "-" + str(timezone_offset),
+            "timezone_offset": f"-{str(timezone_offset)}",
             "source_type": "4",
             "_uid": self.user_id,
             "device_id": str(f"android-{random.randint(0, 1e24):x}"),
@@ -690,7 +685,7 @@ class ThreadsAPI:
         if image_path is not None:
             post_url = POST_URL_IMAGE
             image_content = None
-            if not (os.path.isfile(image_path) and os.path.exists(image_path)):
+            if not os.path.isfile(image_path) or not os.path.exists(image_path):
                 if not __is_valid_url(image_path):
                     return False
                 else:
@@ -716,9 +711,8 @@ class ThreadsAPI:
                 async with session.post(post_url, headers=headers, data=payload) as response:
                     if response.status == 200:
                         return True
-                    else:
-                        print(response)
-                        raise Exception("Failed to post. Got response:\n" + str(response))
+                    print(response)
+                    raise Exception("Failed to post. Got response:\n" + str(response))
         except Exception as e:
             print("[ERROR] ", e)
             raise
